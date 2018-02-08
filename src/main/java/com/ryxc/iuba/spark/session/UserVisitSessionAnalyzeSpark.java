@@ -79,17 +79,19 @@ public class UserVisitSessionAnalyzeSpark {
         //首先将行为数据sesion_id进行groupByKey分组, 可以将session粒度的数据和用户数据进行join
         JavaPairRDD<String, String> session2AggrInfoRDD = aggregateBySession(sqlContext, actionRDD);
 
-        System.out.println(session2AggrInfoRDD.count());
-        for(Tuple2<String, String> tuple2:session2AggrInfoRDD.take(10)){
-            System.out.println(tuple2._2);
-        }
+//        System.out.println(session2AggrInfoRDD.count());
+//        for(Tuple2<String, String> tuple2:session2AggrInfoRDD.take(10)){
+//            System.out.println(tuple2._2);
+//        }
 
         //针对session粒度的聚合数据， 使用指定的参数进行数据过滤
         JavaPairRDD<String,String> filteredSessionid2AggrInfoRDD = filterSession(session2AggrInfoRDD, taskParam);
-        System.out.println(filteredSessionid2AggrInfoRDD.count());
-        for(Tuple2<String, String> tuple2:filteredSessionid2AggrInfoRDD.take(10)){
-            System.out.println(tuple2._2);
-        }
+//        System.out.println(filteredSessionid2AggrInfoRDD.count());
+//        for(Tuple2<String, String> tuple2:filteredSessionid2AggrInfoRDD.take(10)){
+//            System.out.println(tuple2._2);
+//        }
+
+
 
 
 
