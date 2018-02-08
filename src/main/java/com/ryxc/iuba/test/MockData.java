@@ -109,6 +109,8 @@ public class MockData {
 		for(Row _row : df.take(1)) {
 			System.out.println(_row);  
 		}
+		sqlContext.sql("select * from user_visit_action").show();
+
 		
 		/**
 		 * ==================================================================
