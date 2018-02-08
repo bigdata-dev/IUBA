@@ -10,8 +10,6 @@ import com.ryxc.iuba.test.MockData;
 import com.ryxc.iuba.utils.ParamUtils;
 import com.ryxc.iuba.utils.StringUtils;
 import com.ryxc.iuba.utils.ValidUtils;
-import org.apache.commons.io.output.StringBuilderWriter;
-import org.apache.commons.math.util.OpenIntToDoubleHashMap;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaPairRDD;
@@ -23,7 +21,6 @@ import org.apache.spark.sql.DataFrame;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SQLContext;
 import org.apache.spark.sql.hive.HiveContext;
-import org.codehaus.janino.Java;
 import scala.Tuple2;
 
 import java.util.Iterator;
@@ -50,7 +47,7 @@ import java.util.Iterator;
  *
  * 这是spark本身提供的特性
  */
-public class UserVisitSessionAnalyzeSpark {
+public class UserVisitSessionAnalyzeSpark2 {
     public static void main(String[] args) {
 
         args = new String[]{"1"};
