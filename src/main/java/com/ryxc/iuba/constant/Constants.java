@@ -41,6 +41,8 @@ public interface Constants {
 	String PARAM_SEX = "sex";
 	String PARAM_SEACH_KEYWORDS = "keywords";
 	String PARAM_CATEGORY_IDS = "categoryids";
+	String  FIELD_VISIT_LENGTH = "visitLength";
+	String FIELD_STEP_LENGTH = "stepLength";
 
 	String SESSION_COUNT = "session_count";
 
