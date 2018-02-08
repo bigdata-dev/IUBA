@@ -94,6 +94,21 @@ public class UserVisitSessionAnalyzeSpark {
             System.out.println(tuple2._2);
         }
 
+        /**
+         * 对于Accumulator这种分布式累加计算的变量的使用，有一个重要说明
+         *
+         * 从Accumulator中，获取数据，插入数据库的时候，一定要，一定要，是在有某一个action操作以后
+         * 再进行。。。
+         *
+         * 如果没有action的话，那么整个程序根本不会运行。。。
+         *
+         * 是不是在calculateAndPersisitAggrStat方法之后，运行一个action操作，比如count、take
+         * 不对！！！
+         *
+         * 必须把能够触发job执行的操作比如rdd.count()，放在最终写入MySQL方法之前
+         *
+         * 计算出来的结果，在J2EE中，是怎么显示的，是用两张柱状图显示
+         */
         //计算出各个范围的session占比，并写入mysql
         calculateAndPersistAggrStat(sessionAggrStatAccumulator.value(), task.getTaskid());
 
