@@ -32,7 +32,7 @@ import java.util.Iterator;
  * 用户访问session分析spark作业
  * 接收用户创建的分析任务，用户指定条件：
  * 1. 时间范围：起始~结束
- * 2. 性别
+ * 2. 性别f
  * 3. 年龄范围
  * 4. 职业
  * 5. 城市
@@ -41,7 +41,7 @@ import java.util.Iterator;
  *
  * 我们的spark作业如何接受用户创建任务？
  * J2EE平台在接收用户创建任务的请求之后，会将任务信息插入MySQL的task表中，任务参数以JSON格式封装在task_param
- * 字段中
+ * 字段中f
  *
  * 接着J2EE平台会执行我们的spark-submit shell脚本，并将taskid作为参数传递给spark-submit shell脚本
  * spark-submit shell脚本，在执行时，是可以接收参数的，并且会将接收的参数，传递给Spark作业的main函数
@@ -52,7 +52,7 @@ import java.util.Iterator;
 public class UserVisitSessionAnalyzeSpark {
     public static void main(String[] args) {
 
-        args = new String[]{"2"};
+        args = new String[]{"1"};
 
         //构建spark上下文
         SparkConf conf = new SparkConf()
@@ -71,14 +71,15 @@ public class UserVisitSessionAnalyzeSpark {
         JSONObject taskParam = JSONObject.parseObject(task.getTaskParam());
         System.out.println("###################taskParam:"+taskParam);
 
+
         //如果要进行session粒度的数据聚合
         //首先要从user_visit_action表中，查询指定日期范围
         JavaRDD<Row> actionRDD = getActionRDDByDateRange(sqlContext, taskParam);
-        System.out.println("###################:"+actionRDD.count());
+        System.out.println("###################getActionRDDByDateRange:"+actionRDD.count());
         //首先将行为数据sesion_id进行groupByKey分组, 可以将session粒度的数据和用户数据进行join
         JavaPairRDD<String, String> session2AggrInfoRDD = aggregateBySession(sqlContext, actionRDD);
 
-        System.out.println(session2AggrInfoRDD.count());
+        System.out.println("##################aggregateBySession:"+ session2AggrInfoRDD.count());
         for(Tuple2<String, String> tuple2:session2AggrInfoRDD.take(10)){
             System.out.println(tuple2._2);
         }
@@ -89,81 +90,81 @@ public class UserVisitSessionAnalyzeSpark {
         JavaPairRDD<String,String> filteredSessionid2AggrInfoRDD = filterSessionAndAggrStat(
                 session2AggrInfoRDD, taskParam, sessionAggrStatAccumulator);
 
-        System.out.println(filteredSessionid2AggrInfoRDD.count());
+        System.out.println("##################filterSessionAndAggrStat:"+ filteredSessionid2AggrInfoRDD.count());
         for(Tuple2<String, String> tuple2:filteredSessionid2AggrInfoRDD.take(10)){
             System.out.println(tuple2._2);
         }
-
-        /**
-         * 对于Accumulator这种分布式累加计算的变量的使用，有一个重要说明
-         *
-         * 从Accumulator中，获取数据，插入数据库的时候，一定要，一定要，是在有某一个action操作以后
-         * 再进行。。。
-         *
-         * 如果没有action的话，那么整个程序根本不会运行。。。
-         *
-         * 是不是在calculateAndPersisitAggrStat方法之后，运行一个action操作，比如count、take
-         * 不对！！！
-         *
-         * 必须把能够触发job执行的操作比如rdd.count()，放在最终写入MySQL方法之前
-         *
-         * 计算出来的结果，在J2EE中，是怎么显示的，是用两张柱状图显示
-         */
-        //计算出各个范围的session占比，并写入mysql
-        calculateAndPersistAggrStat(sessionAggrStatAccumulator.value(), task.getTaskid());
-
-
-        /**
-         * session聚合统计（统计出访问时长和访问步长，各个区间的session数量占总session数量的比例）
-         *
-         * 如果不进行重构，直接来实现，思路：
-         * 1、actionRDD，映射成<sessionid,Row>的格式
-         * 2、按sessionid聚合，计算出每个session的访问时长和访问步长，生成一个新的RDD
-         * 3、遍历新生成的RDD，将每个session的访问时长和访问步长，去更新自定义Accumulator中的对应的值
-         * 4、使用自定义Accumulator中的统计值，去计算各个区间的比例
-         * 5、将最后计算出来的结果，写入MySQL对应的表中
-         *
-         * 普通实现思路的问题：
-         * 1、为什么还要用actionRDD，去映射？其实我们之前在session聚合的时候，映射已经做过了。多此一举
-         * 2、是不是一定要，为了session的聚合这个功能，单独去遍历一遍session？其实没有必要，已经有session数据
-         * 		之前过滤session的时候，其实，就相当于，是在遍历session，那么这里就没有必要再过滤一遍了
-         *
-         * 重构实现思路：
-         * 1、不要去生成任何新的RDD（处理上亿的数据）
-         * 2、不要去单独遍历一遍session的数据（处理上千万的数据）
-         * 3、可以在进行session聚合的时候，就直接计算出来每个session的访问时长和访问步长
-         * 4、在进行过滤的时候，本来就要遍历所有的聚合session信息，此时，就可以在某个session通过筛选条件后
-         * 		将其访问时长和访问步长，累加到自定义的Accumulator上面去
-         * 5、就是两种截然不同的思考方式，和实现方式，在面对上亿，上千万数据的时候，甚至可以节省时间长达
-         * 		半个小时，或者数个小时
-         *
-         * 开发Spark大型复杂项目的一些经验准则：
-         * 1、尽量少生成RDD
-         * 2、尽量少对RDD进行算子操作，如果有可能，尽量在一个算子里面，实现多个需要做的功能
-         * 3、尽量少对RDD进行shuffle算子操作，比如groupByKey、reduceByKey、sortByKey（map、mapToPair）
-         * 		shuffle操作，会导致大量的磁盘读写，严重降低性能
-         * 		有shuffle的算子，和没有shuffle的算子，甚至性能，会达到几十分钟，甚至数个小时的差别
-         * 		有shfufle的算子，很容易导致数据倾斜，一旦数据倾斜，简直就是性能杀手（完整的解决方案）
-         * 4、无论做什么功能，性能第一
-         * 		在传统的J2EE或者.NET后者PHP，软件/系统/网站开发中，我认为是架构和可维护性，可扩展性的重要
-         * 		程度，远远高于了性能，大量的分布式的架构，设计模式，代码的划分，类的划分（高并发网站除外）
-         *
-         * 		在大数据项目中，比如MapReduce、Hive、Spark、Storm，我认为性能的重要程度，远远大于一些代码
-         * 		的规范，和设计模式，代码的划分，类的划分；大数据，大数据，最重要的，就是性能
-         * 		主要就是因为大数据以及大数据项目的特点，决定了，大数据的程序和项目的速度，都比较慢
-         * 		如果不优先考虑性能的话，会导致一个大数据处理程序运行时间长度数个小时，甚至数十个小时
-         * 		此时，对于用户体验，简直就是一场灾难
-         *
-         * 		所以，推荐大数据项目，在开发和代码的架构中，优先考虑性能；其次考虑功能代码的划分、解耦合
-         *
-         * 		我们如果采用第一种实现方案，那么其实就是代码划分（解耦合、可维护）优先，设计优先
-         * 		如果采用第二种方案，那么其实就是性能优先
-         *
-         * 		讲了这么多，其实大家不要以为我是在岔开话题，大家不要觉得项目的课程，就是单纯的项目本身以及
-         * 		代码coding最重要，其实项目，我觉得，最重要的，除了技术本身和项目经验以外；非常重要的一点，就是
-         * 		积累了，处理各种问题的经验
-         *
-         */
+//
+//        /**
+//         * 对于Accumulator这种分布式累加计算的变量的使用，有一个重要说明
+//         *
+//         * 从Accumulator中，获取数据，插入数据库的时候，一定要，一定要，是在有某一个action操作以后
+//         * 再进行。。。
+//         *
+//         * 如果没有action的话，那么整个程序根本不会运行。。。
+//         *
+//         * 是不是在calculateAndPersisitAggrStat方法之后，运行一个action操作，比如count、take
+//         * 不对！！！
+//         *
+//         * 必须把能够触发job执行的操作比如rdd.count()，放在最终写入MySQL方法之前
+//         *
+//         * 计算出来的结果，在J2EE中，是怎么显示的，是用两张柱状图显示
+//         */
+//        //计算出各个范围的session占比，并写入mysql
+//        calculateAndPersistAggrStat(sessionAggrStatAccumulator.value(), task.getTaskid());
+//
+//
+//        /**
+//         * session聚合统计（统计出访问时长和访问步长，各个区间的session数量占总session数量的比例）
+//         *
+//         * 如果不进行重构，直接来实现，思路：
+//         * 1、actionRDD，映射成<sessionid,Row>的格式
+//         * 2、按sessionid聚合，计算出每个session的访问时长和访问步长，生成一个新的RDD
+//         * 3、遍历新生成的RDD，将每个session的访问时长和访问步长，去更新自定义Accumulator中的对应的值
+//         * 4、使用自定义Accumulator中的统计值，去计算各个区间的比例
+//         * 5、将最后计算出来的结果，写入MySQL对应的表中
+//         *
+//         * 普通实现思路的问题：
+//         * 1、为什么还要用actionRDD，去映射？其实我们之前在session聚合的时候，映射已经做过了。多此一举
+//         * 2、是不是一定要，为了session的聚合这个功能，单独去遍历一遍session？其实没有必要，已经有session数据
+//         * 		之前过滤session的时候，其实，就相当于，是在遍历session，那么这里就没有必要再过滤一遍了
+//         *
+//         * 重构实现思路：
+//         * 1、不要去生成任何新的RDD（处理上亿的数据）
+//         * 2、不要去单独遍历一遍session的数据（处理上千万的数据）
+//         * 3、可以在进行session聚合的时候，就直接计算出来每个session的访问时长和访问步长
+//         * 4、在进行过滤的时候，本来就要遍历所有的聚合session信息，此时，就可以在某个session通过筛选条件后
+//         * 		将其访问时长和访问步长，累加到自定义的Accumulator上面去
+//         * 5、就是两种截然不同的思考方式，和实现方式，在面对上亿，上千万数据的时候，甚至可以节省时间长达
+//         * 		半个小时，或者数个小时
+//         *
+//         * 开发Spark大型复杂项目的一些经验准则：
+//         * 1、尽量少生成RDD
+//         * 2、尽量少对RDD进行算子操作，如果有可能，尽量在一个算子里面，实现多个需要做的功能
+//         * 3、尽量少对RDD进行shuffle算子操作，比如groupByKey、reduceByKey、sortByKey（map、mapToPair）
+//         * 		shuffle操作，会导致大量的磁盘读写，严重降低性能
+//         * 		有shuffle的算子，和没有shuffle的算子，甚至性能，会达到几十分钟，甚至数个小时的差别
+//         * 		有shfufle的算子，很容易导致数据倾斜，一旦数据倾斜，简直就是性能杀手（完整的解决方案）
+//         * 4、无论做什么功能，性能第一
+//         * 		在传统的J2EE或者.NET后者PHP，软件/系统/网站开发中，我认为是架构和可维护性，可扩展性的重要
+//         * 		程度，远远高于了性能，大量的分布式的架构，设计模式，代码的划分，类的划分（高并发网站除外）
+//         *
+//         * 		在大数据项目中，比如MapReduce、Hive、Spark、Storm，我认为性能的重要程度，远远大于一些代码
+//         * 		的规范，和设计模式，代码的划分，类的划分；大数据，大数据，最重要的，就是性能
+//         * 		主要就是因为大数据以及大数据项目的特点，决定了，大数据的程序和项目的速度，都比较慢
+//         * 		如果不优先考虑性能的话，会导致一个大数据处理程序运行时间长度数个小时，甚至数十个小时
+//         * 		此时，对于用户体验，简直就是一场灾难
+//         *
+//         * 		所以，推荐大数据项目，在开发和代码的架构中，优先考虑性能；其次考虑功能代码的划分、解耦合
+//         *
+//         * 		我们如果采用第一种实现方案，那么其实就是代码划分（解耦合、可维护）优先，设计优先
+//         * 		如果采用第二种方案，那么其实就是性能优先
+//         *
+//         * 		讲了这么多，其实大家不要以为我是在岔开话题，大家不要觉得项目的课程，就是单纯的项目本身以及
+//         * 		代码coding最重要，其实项目，我觉得，最重要的，除了技术本身和项目经验以外；非常重要的一点，就是
+//         * 		积累了，处理各种问题的经验
+//         *
+//         */
 
         sc.close();
 
@@ -220,11 +221,12 @@ public class UserVisitSessionAnalyzeSpark {
     private static JavaPairRDD<String, String> aggregateBySession(SQLContext sqlContext, JavaRDD<Row> actionRDD){
         //将Row映射成<sessionid, Row>格式
         JavaPairRDD<String, Row> sessionid2ActionRDD = actionRDD.mapToPair(
-                //第一个参数数输入，第二和第三个参数是tuple第一个值和第二个值
+                //第一个参数数输入，第二和第三个参数是函数的输出  （tuple第一个值和第二个值）
                 new PairFunction<Row, String, Row>() {
                         private static final long serialVersionUID = 1L;
                         @Override
                         public Tuple2<String, Row> call(Row row) throws Exception {
+                            // sessionId 序号是2
                             return new Tuple2<String, Row>(row.getString(2), row);
                         }
         });
@@ -296,6 +298,7 @@ public class UserVisitSessionAnalyzeSpark {
                         //计算session访问时长(秒)
                         long visitLenth = (endTime.getTime() - startTime.getTime()) / 1000;
 
+                        //截取两边逗号
                         String searchKeywords = StringUtils.trimComma(searchKeywordsBuffer.toString());
                         String clickCategoryIds = StringUtils.trimComma(categoryIdsBuffer.toString());
 
@@ -315,6 +318,7 @@ public class UserVisitSessionAnalyzeSpark {
         String sql = "select * from user_info";
         JavaRDD<Row> userInfoRDD = sqlContext.sql(sql).javaRDD();
 
+        //将userInfo ROW 映射
         JavaPairRDD<Long, Row> userid2InfoRDD = userInfoRDD.mapToPair(new PairFunction<Row, Long, Row>() {
             @Override
             public Tuple2<Long, Row> call(Row row) throws Exception {
@@ -421,7 +425,7 @@ public class UserVisitSessionAnalyzeSpark {
 
                         //按照搜索词进行过滤
                         //session搜索了 火锅 蛋糕 烧烤
-                        //筛选条件 火锅 串串香
+                        //筛选条件 火锅 串串香 ipone手机
                         //in的校验方法 只要有任何一个搜索词相匹配就算通过
                         if(!ValidUtils.in(aggrInfo, Constants.FILED_SEARCH_KEYWORDS, parameter,
                                 Constants.PARAM_SEACH_KEYWORDS)){

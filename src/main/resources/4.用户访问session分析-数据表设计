@@ -92,6 +92,15 @@ CREATE TABLE `task` (
   PRIMARY KEY (`task_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8
 
+truncate table `task`;
+INSERT INTO `task`(`task_id`, `task_name`, `task_param`)
+values('1','按条件筛选session',
+'{"startDate": ["2018-05-22"],
+"endDate": ["2018-05-23"],
+"startAge": ["40"],
+"endAge": ["50"]
+}');
+
 在数据设计以后，就正式进入一个漫长的环节，就是编码实现阶段，coding阶段。在编码实现阶段，每开发完一个功能，
 其实都会走后续的两个环节，就是本地测试和生产环境测试。
 
