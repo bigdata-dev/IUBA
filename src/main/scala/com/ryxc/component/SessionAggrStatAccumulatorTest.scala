@@ -29,6 +29,7 @@ object SessionAggrStatAccumulatorTest {
 
     val sc = new SparkContext(sparkConf)
 
+    // 测试自定义Accumulator
     val sessionAggrStatAccumulator = sc.accumulator("")(SessionAggrStatAccumulator)
 
     val arr = Array(Constants.TIME_PERIOD_1s_3s, Constants.TIME_PERIOD_4s_6s)
