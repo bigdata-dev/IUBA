@@ -1,10 +1,6 @@
 package com.ryxc.iuba.test;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -17,6 +13,7 @@ import org.apache.spark.sql.types.StructType;
 
 import com.ryxc.iuba.utils.DateUtils;
 import com.ryxc.iuba.utils.StringUtils;
+import org.dmg.pmml.False;
 
 /**
  * 模拟数据程序
@@ -24,6 +21,11 @@ import com.ryxc.iuba.utils.StringUtils;
  *
  */
 public class MockData {
+
+	private static String genActionTime(String baseActionTime){
+		Random random = new Random();
+		return baseActionTime + ":" + StringUtils.fulfuill(String.valueOf(random.nextInt(59))) + ":" + StringUtils.fulfuill(String.valueOf(random.nextInt(59)));
+	}
 
 	/**
 	 * 模拟数据
@@ -44,14 +46,24 @@ public class MockData {
 			long userid = random.nextInt(100);    
 			
 			for(int j = 0; j < 10; j++) {
-				String sessionid = UUID.randomUUID().toString().replace("-", "");  
+				String sessionid = UUID.randomUUID().toString().replace("-", "");
 				String baseActionTime = date + " " + random.nextInt(23);
 				
 				Long clickCategoryId = null;
+
+
+				List actionTimelist = new ArrayList();
 				  
-				for(int k = 0; k < random.nextInt(100); k++) {
+				for(int k = 0; k < random.nextInt(100)+2; k++) {
 					long pageid = random.nextInt(10);    
-					String actionTime = baseActionTime + ":" + StringUtils.fulfuill(String.valueOf(random.nextInt(59))) + ":" + StringUtils.fulfuill(String.valueOf(random.nextInt(59)));
+
+					String actionTime = genActionTime(baseActionTime);
+					while(actionTimelist.contains(actionTime)){
+						actionTime = genActionTime(baseActionTime);
+					}
+					actionTimelist.add(actionTime);
+
+
 					String searchKeyword = null;
 					Long clickProductId = null;
 					String orderCategoryIds = null;

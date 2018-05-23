@@ -96,8 +96,8 @@ truncate table `task`;
 INSERT INTO `task`(`task_id`, `task_name`, `task_param`)
 values('1','按条件筛选session',
 '{"startDate": ["2018-05-22"],
-"endDate": ["2018-05-23"],
-"startAge": ["40"],
+"endDate": ["2018-05-24"],
+"startAge": ["10"],
 "endAge": ["50"]
 }');
 
